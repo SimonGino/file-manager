@@ -5,6 +5,16 @@ import Documents from '@/pages/Documents';
 import SharedDocument from '@/pages/SharedDocument';
 import SharedFiles from '@/pages/SharedFiles';
 
+// 检查是否已登录
+const isAuthenticated = () => {
+  return !!localStorage.getItem('token');
+};
+
+// 需要认证的路由守卫
+const AuthRoute = ({ children }: { children: React.ReactNode }) => {
+  return isAuthenticated() ? <>{children}</> : <Navigate to="/shared" replace />;
+};
+
 const routes: RouteObject[] = [
   {
     path: '/',
@@ -12,11 +22,15 @@ const routes: RouteObject[] = [
     children: [
       {
         path: '/',
-        element: <Navigate to="/documents" replace />,
+        element: <Navigate to={isAuthenticated() ? "/documents" : "/shared"} replace />,
       },
       {
         path: '/documents',
-        element: <Documents />,
+        element: (
+          <AuthRoute>
+            <Documents />
+          </AuthRoute>
+        ),
       },
       {
         path: '/shared',
@@ -34,4 +48,4 @@ const routes: RouteObject[] = [
   },
 ];
 
-export const router = createBrowserRouter(routes); 
+export const router = createBrowserRouter(routes);
