@@ -9,7 +9,6 @@ const Login: React.FC = () => {
   const [form] = Form.useForm();
 
   const onFinish = async (values: { email: string; password: string }) => {
-    debugger
     try {
       const formData = new FormData();
       formData.append('username', values.email);
