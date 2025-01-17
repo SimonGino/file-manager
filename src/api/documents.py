@@ -535,12 +535,12 @@ async def cancel_document_share(
 @router.get("/shared")
 async def list_shared_documents(
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user)
+    # current_user = Depends(get_current_user)
 ):
     """获取当前用户所有已分享的文件列表"""
     try:
         query = select(Document).where(
-            Document.uploader_id == current_user.id,
+            # Document.uploader_id == current_user.id,
             Document.is_shared == True,
             Document.share_expired_at > datetime.now(timezone.utc)
         ).order_by(Document.updated_at.desc())

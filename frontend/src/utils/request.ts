@@ -25,15 +25,20 @@ request.interceptors.response.use(
   },
   (error) => {
     const { response } = error;
+    
+    // 显示错误消息
     if (response?.data?.message) {
       message.error(response.data.message);
     } else {
       message.error('An error occurred');
     }
-    if (response?.status === 401) {
+
+    // 只有在访问需要认证的接口时才跳转到登录页
+    if (response?.status === 401 && !window.location.pathname.startsWith('/shared')) {
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );
