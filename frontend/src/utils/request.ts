@@ -1,14 +1,15 @@
 import axios from 'axios';
+import { getStoredToken, clearUserAuth } from './auth';
 import { message } from 'antd';
 
 const request = axios.create({
   baseURL: '/api',
-  timeout: 10000,
+  timeout: 10000
 });
 
 request.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = getStoredToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,8 +25,12 @@ request.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    const { response } = error;
-    
+    const { response, message } = error || {};
+    if (message) {
+      message.error(message);
+      return new Promise(() => {});
+    }
+
     // 显示错误消息
     if (response?.data?.message) {
       message.error(response.data.message);
@@ -38,9 +43,9 @@ request.interceptors.response.use(
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
-    
+
     return Promise.reject(error);
   }
 );
 
-export default request; 
+export default request;

@@ -13,7 +13,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onSuccess }) => {
     name: 'file',
     action: '/api/documents/upload',
     headers: {
-      Authorization: `Bearer ${localStorage.getItem('token')}`,
+      Authorization: `Bearer ${localStorage.getItem('token')}`
     },
     onChange(info) {
       if (info.file.status === 'done') {
@@ -22,7 +22,7 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onSuccess }) => {
         message.error(`${info.file.name} upload failed.`);
       }
     },
-    showUploadList: false,
+    showUploadList: false
   };
 
   return (
@@ -32,4 +32,4 @@ const UploadButton: React.FC<UploadButtonProps> = ({ onSuccess }) => {
   );
 };
 
-export default UploadButton; 
+export default UploadButton;

@@ -160,11 +160,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
                     { pattern: /^\d+$/, message: 'Access code must be digits' }
                   ]}
                 >
-                  <Input
-                    maxLength={4}
-                    style={{ width: 120 }}
-                    placeholder="4 digits"
-                  />
+                  <Input maxLength={4} style={{ width: 120 }} placeholder="4 digits" />
                 </Form.Item>
               )
             }
@@ -233,4 +229,4 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
   );
 };
 
-export default ShareDialog; 
+export default ShareDialog;

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Card, Form, Input, Button, message } from 'antd';
+import { Card, Form, Input, Button, message, Space } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import request from '@/utils/request';
 import { LoginResponse } from '@/types/user';
+import { setUserAuth } from '@/utils/auth';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -15,30 +16,27 @@ const Login: React.FC = () => {
       formData.append('password', values.password);
       formData.append('grant_type', 'password');
 
-      const response = await request.post<any, LoginResponse>('/token', formData);
-      
-      localStorage.setItem('token', response.access_token);
-      message.success('Login successful');
-      navigate('/documents');
+      const { user, access_token } = await request.post<any, LoginResponse>('/token', formData);
+      setUserAuth(user, access_token);
+      message.success('登录成功');
+      navigate('/');
     } catch (error) {
       console.error('Login error:', error);
     }
   };
 
   return (
-    <div style={{ 
-      height: '100vh', 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center',
-      background: '#f0f2f5' 
-    }}>
+    <div
+      style={{
+        height: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: '#f0f2f5'
+      }}
+    >
       <Card title="Login" style={{ width: 400 }}>
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={onFinish}
-        >
+        <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item
             label="Email"
             name="email"
@@ -50,18 +48,20 @@ const Login: React.FC = () => {
             <Input />
           </Form.Item>
 
-          <Form.Item
-            label="Password"
-            name="password"
-            rules={[{ required: true, message: 'Please input your password!' }]}
-          >
+          <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Please input your password!' }]}>
             <Input.Password />
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
-              Login
-            </Button>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Button type="primary" htmlType="submit" block>
+                Login
+              </Button>
+
+              <Button type="link" onClick={() => navigate('/register')} block>
+                Register Now
+              </Button>
+            </Space>
           </Form.Item>
         </Form>
       </Card>
@@ -69,4 +69,4 @@ const Login: React.FC = () => {
   );
 };
 
-export default Login; 
+export default Login;

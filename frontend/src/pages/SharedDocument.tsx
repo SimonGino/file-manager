@@ -31,13 +31,12 @@ const SharedDocument: React.FC = () => {
       try {
         const response = await request.get(`/documents/shared/${shareUuid}/check`);
         setShareInfo(response.data);
-        
+
         // 如果不需要密码，直接获取文件信息
         if (!response.data.requires_password) {
           getDocumentInfo();
         }
       } catch (error: any) {
-        message.error('Share not found or expired');
       } finally {
         setIsLoading(false);
       }
@@ -97,34 +96,24 @@ const SharedDocument: React.FC = () => {
       return (
         <Card style={{ maxWidth: 400, margin: '48px auto' }}>
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <h2 style={{ textAlign: 'center', margin: 0 }}>
-              This document is password protected
-            </h2>
-            <p style={{ textAlign: 'center', margin: 0 }}>
-              {shareInfo.filename}
-            </p>
+            <h2 style={{ textAlign: 'center', margin: 0 }}>This document is password protected</h2>
+            <p style={{ textAlign: 'center', margin: 0 }}>{shareInfo.filename}</p>
             <div>
               <Input
                 value={shareCode}
-                onChange={e => setShareCode(e.target.value.replace(/[^\d]/g, ''))}
+                onChange={(e) => setShareCode(e.target.value.replace(/[^\d]/g, ''))}
                 maxLength={4}
                 placeholder="Enter 4-digit code"
-                style={{ 
-                  textAlign: 'center', 
-                  fontSize: '24px', 
+                style={{
+                  textAlign: 'center',
+                  fontSize: '24px',
                   letterSpacing: '8px',
                   padding: '8px'
                 }}
                 onPressEnter={handleSubmitCode}
               />
             </div>
-            <Button 
-              type="primary" 
-              block
-              size="large"
-              onClick={handleSubmitCode}
-              loading={isSubmitting}
-            >
+            <Button type="primary" block size="large" onClick={handleSubmitCode} loading={isSubmitting}>
               View Document
             </Button>
           </Space>
@@ -137,16 +126,9 @@ const SharedDocument: React.FC = () => {
         <Card>
           <h2>{documentInfo.filename}</h2>
           {documentInfo.mime_type.startsWith('image/') ? (
-            <img 
-              src={documentInfo.preview_url} 
-              style={{ maxWidth: '100%', maxHeight: '80vh' }} 
-              alt={documentInfo.filename} 
-            />
+            <img src={documentInfo.preview_url} style={{ maxWidth: '100%', maxHeight: '80vh' }} alt={documentInfo.filename} />
           ) : documentInfo.mime_type.startsWith('video/') ? (
-            <video 
-              controls 
-              style={{ maxWidth: '100%', maxHeight: '80vh' }}
-            >
+            <video controls style={{ maxWidth: '100%', maxHeight: '80vh' }}>
               <source src={documentInfo.preview_url} type={documentInfo.mime_type} />
               Your browser does not support the video tag.
             </video>
@@ -158,11 +140,7 @@ const SharedDocument: React.FC = () => {
           ) : (
             <div style={{ textAlign: 'center', padding: '20px' }}>
               <p>This file type cannot be previewed directly.</p>
-              <Button 
-                type="primary" 
-                href={documentInfo.preview_url}
-                target="_blank"
-              >
+              <Button type="primary" href={documentInfo.preview_url} target="_blank">
                 Download File
               </Button>
             </div>
@@ -176,27 +154,25 @@ const SharedDocument: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between',
-        background: '#fff',
-        padding: '0 24px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
-          Shared Document
-        </div>
+      <Header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          background: '#fff',
+          padding: '0 24px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}
+      >
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>Shared Document</div>
         <Button type="link" onClick={() => navigate('/documents')}>
           Back to Documents
         </Button>
       </Header>
-      
-      <Content style={{ padding: '24px' }}>
-        {renderContent()}
-      </Content>
+
+      <Content style={{ padding: '24px' }}>{renderContent()}</Content>
     </Layout>
   );
 };
 
-export default SharedDocument; 
+export default SharedDocument;

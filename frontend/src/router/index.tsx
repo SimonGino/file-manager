@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, RouteObject } from 'react-router-dom';
 import MainLayout from '@/layouts/MainLayout';
 import Login from '@/pages/Login';
+import Register from '@/pages/Register';
 import Documents from '@/pages/Documents';
 import SharedDocument from '@/pages/SharedDocument';
 import SharedFiles from '@/pages/SharedFiles';
@@ -37,6 +38,10 @@ const routes: RouteObject[] = [
         element: <SharedFiles />,
       },
     ],
+  },
+  {
+    path: '/register',
+    element: <Register />,
   },
   {
     path: '/login',
