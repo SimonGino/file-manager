@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Radio, Input, Space, Button, message } from 'antd';
-import { CopyOutlined } from '@ant-design/icons';
-import { Document } from '@/types/document';
+import { Modal, Form, Switch, Input, Space, Button, message, Radio } from 'antd';
+import { CopyOutlined, EditOutlined } from '@ant-design/icons';
 import request from '@/utils/request';
+import { Document } from '@/types/document';
 
 interface ShareDialogProps {
   visible: boolean;
@@ -10,30 +10,33 @@ interface ShareDialogProps {
   document: Document | null;
 }
 
-interface ShareResponse {
-  share_uuid: string;
-  share_type: 'no_password' | 'with_password';
-  share_code?: string;
-  share_expired_at: string;
-  filename: string;
-}
-
 const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document }) => {
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [shareInfo, setShareInfo] = useState<ShareResponse | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareInfo, setShareInfo] = useState<any>(null);
 
-  // 检查文件是否已分享
+  // 获取分享状态
   useEffect(() => {
     const checkShareStatus = async () => {
       if (!document?.id || !visible) return;
-      
+
       try {
         const response = await request.get(`/documents/${document.id}/share`);
         setShareInfo(response.data);
-      } catch (error: any) {
+        setIsSharing(response.data.is_shared);
+
+        if (response.data.is_shared) {
+          // 设置表单初始值
+          form.setFieldsValue({
+            share_type: response.data.share_type,
+            share_code: response.data.share_code,
+            expire_days: response.data.expire_days || 'forever'
+          });
+        }
+      } catch (error) {
+        // 404 表示未分享，其他错误才提示
         if (error.response?.status !== 404) {
-          message.error('Failed to check share status');
+          message.error('Failed to get share status');
         }
       }
     };
@@ -41,68 +44,59 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
     checkShareStatus();
   }, [document?.id, visible]);
 
-  const handleClose = () => {
-    setShareInfo(null);
-    form.resetFields();
-    onClose();
-  };
+  // 处理分享开关
+  const handleSharingChange = async (checked: boolean) => {
+    if (!document?.id) return;
 
-  const handleShare = async (values: any) => {
-    if (!document) return;
-    
-    setLoading(true);
-    try {
-      const response = await request.post(`/documents/share/${document.id}`, {
-        share_type: values.share_type,
-        share_code: values.share_code,
-      });
-      
-      setShareInfo(response.data);
-      message.success('Document shared successfully');
-      handleClose();
-    } catch (error) {
-      message.error('Failed to share document');
-    } finally {
-      setLoading(false);
+    if (checked) {
+      // 创建分享
+      try {
+        const values = await form.validateFields();
+        const shareData = {
+          share_type: values.share_type || 'no_password',
+          share_code: values.share_type === 'with_password' ? values.share_code : undefined,
+          expire_days: values.expire_days === 'forever' ? null : parseInt(values.expire_days)
+        };
+
+        const response = await request.post(`/documents/${document.id}/share`, shareData);
+        setShareInfo(response.data);
+        setIsSharing(true);
+        message.success('Document shared successfully');
+      } catch (error) {
+        setIsSharing(false);
+        message.error('Failed to share document');
+      }
+    } else {
+      // 取消分享
+      try {
+        await request.delete(`/documents/${document.id}/share`);
+        setShareInfo(null);
+        setIsSharing(false);
+        form.resetFields();
+        message.success('Share cancelled successfully');
+      } catch (error) {
+        setIsSharing(true);
+        message.error('Failed to cancel share');
+      }
     }
   };
 
-  const handleUpdateCode = async () => {
-    if (!shareInfo) return;
-    
+  // 处理设置更新
+  const handleSettingsChange = async () => {
+    if (!document?.id || !isSharing) return;
+
     try {
       const values = await form.validateFields();
-      const response = await request.put(`/documents/share/${shareInfo.share_uuid}`, {
-        share_code: values.new_share_code,
-      });
-      
+      const shareData = {
+        share_type: values.share_type,
+        share_code: values.share_type === 'with_password' ? values.share_code : undefined,
+        expire_days: values.expire_days === 'forever' ? null : parseInt(values.expire_days)
+      };
+
+      const response = await request.put(`/documents/${document.id}/share`, shareData);
       setShareInfo(response.data);
-      message.success('Share code updated successfully');
     } catch (error) {
-      message.error('Failed to update share code');
-    }
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      message.success('Copied to clipboard');
-    });
-  };
-
-  const getShareLink = () => {
-    if (!shareInfo) return '';
-    return `${window.location.origin}/shared/${shareInfo.share_uuid}`;
-  };
-
-  const handleCancelShare = async () => {
-    if (!document?.id) return;
-    
-    try {
-      await request.delete(`/documents/${document.id}/share`);
-      message.success('Share cancelled successfully');
-      setShareInfo(null);
-    } catch (error) {
-      message.error('Failed to cancel share');
+      message.error('Failed to update share settings');
     }
   };
 
@@ -110,37 +104,60 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
     <Modal
       title="Share Document"
       open={visible}
-      onCancel={handleClose}
+      onCancel={onClose}
       footer={null}
-      width={600}
     >
-      {!shareInfo?.is_shared ? (
-        <Form form={form} onFinish={handleShare} initialValues={{ share_type: 'no_password' }}>
+      <div style={{ marginBottom: 24 }}>
+        <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+          <span>Share Document</span>
+          <Switch
+            checked={isSharing}
+            onChange={handleSharingChange}
+          />
+        </Space>
+      </div>
+
+      {isSharing && (
+        <Form
+          form={form}
+          layout="vertical"
+        >
           <Form.Item
-            name="share_type"
-            label="Share Type"
+            name="expire_days"
+            initialValue="forever"
           >
             <Radio.Group>
-              <Radio value="no_password">No Password</Radio>
-              <Radio value="with_password">With Password</Radio>
+              <Radio value="forever">永久</Radio>
+              <Radio value="7">7天</Radio>
+              <Radio value="1">1天</Radio>
+            </Radio.Group>
+          </Form.Item>
+
+          <Form.Item
+            name="share_type"
+            initialValue="no_password"
+          >
+            <Radio.Group>
+              <Radio value="no_password">无密码</Radio>
+              <Radio value="with_password">密码访问</Radio>
             </Radio.Group>
           </Form.Item>
 
           <Form.Item
             noStyle
-            shouldUpdate={(prevValues, currentValues) => 
+            shouldUpdate={(prevValues, currentValues) =>
               prevValues.share_type !== currentValues.share_type
             }
           >
-            {({ getFieldValue }) => 
-              getFieldValue('share_type') === 'with_password' ? (
+            {({ getFieldValue }) =>
+              getFieldValue('share_type') === 'with_password' && (
                 <Form.Item
                   name="share_code"
-                  label="Share Code"
+                  label="Access Code"
                   rules={[
-                    { required: true, message: 'Please input share code' },
-                    { len: 4, message: 'Share code must be 4 digits' },
-                    { pattern: /^\d+$/, message: 'Share code must be digits' }
+                    { required: true, message: 'Please input access code' },
+                    { len: 4, message: 'Access code must be 4 digits' },
+                    { pattern: /^\d+$/, message: 'Access code must be digits' }
                   ]}
                 >
                   <Input
@@ -149,103 +166,68 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
                     placeholder="4 digits"
                   />
                 </Form.Item>
-              ) : null
+              )
             }
           </Form.Item>
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" loading={loading}>
-              Share
-            </Button>
-          </Form.Item>
-        </Form>
-      ) : (
-        <div>
-          <div style={{ marginBottom: 16 }}>
-            <h4>Share Link:</h4>
-            <Space>
-              <Input 
-                value={getShareLink()} 
-                readOnly 
-                style={{ width: 400 }}
-              />
-              <Button 
-                icon={<CopyOutlined />} 
-                onClick={() => copyToClipboard(getShareLink())}
-              >
-                Copy
-              </Button>
-            </Space>
-          </div>
-
-          {shareInfo.share_type === 'with_password' && (
-            <div style={{ marginBottom: 16 }}>
-              <h4>Share Code:</h4>
-              <Space>
-                <Input 
-                  value={shareInfo.share_code} 
-                  readOnly 
-                  style={{ width: 120 }}
-                />
-                <Button 
-                  icon={<CopyOutlined />} 
-                  onClick={() => copyToClipboard(shareInfo.share_code!)}
-                >
-                  Copy
-                </Button>
-              </Space>
-
-              <div style={{ marginTop: 16 }}>
-                <h4>Update Share Code:</h4>
+          {shareInfo?.share_uuid && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 8 }}>Share Link:</div>
                 <Space>
-                  <Form.Item
-                    name="new_share_code"
-                    rules={[
-                      { required: true, message: 'Please input new share code' },
-                      { len: 4, message: 'Share code must be 4 digits' },
-                      { pattern: /^\d+$/, message: 'Share code must be digits' }
-                    ]}
-                    style={{ marginBottom: 0 }}
+                  <Input
+                    value={`${window.location.origin}/shared/${shareInfo.share_uuid}`}
+                    readOnly
+                  />
+                  <Button
+                    icon={<CopyOutlined />}
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}/shared/${shareInfo.share_uuid}`
+                      );
+                      message.success('Link copied');
+                    }}
                   >
-                    <Input
-                      maxLength={4}
-                      style={{ width: 120 }}
-                      placeholder="New code"
-                    />
-                  </Form.Item>
-                  <Button type="primary" onClick={handleUpdateCode}>
-                    Update
+                    Copy
                   </Button>
+                  <Button
+                      icon={<EditOutlined />}
+                      onClick={() => {
+                        handleSettingsChange()
+                        message.success('Share settings updated successfully');
+                      }}
+                    >
+                      Update
+                    </Button>
                 </Space>
               </div>
+
+              {/* {shareInfo.share_code && (
+                <div>
+                  <div style={{ marginBottom: 8 }}>Access Code:</div>
+                  <Space>
+                    <Input
+                      value={shareInfo.share_code}
+                      readOnly
+                      style={{ width: 120 }}
+                    />
+                    <Button
+                      icon={<CopyOutlined />}
+                      onClick={() => {
+                        navigator.clipboard.writeText(shareInfo.share_code);
+                        message.success('Code copied');
+                      }}
+                    >
+                      Copy
+                    </Button>
+
+                   
+                  </Space>
+                </div>
+              )} */}
             </div>
           )}
-
-          <div>
-            <p>Expires at: {new Date(shareInfo.share_expired_at).toLocaleString()}</p>
-          </div>
-
-          <div style={{ marginTop: 16 }}>
-            <Space>
-              <Button onClick={handleClose}>
-                Close
-              </Button>
-              <Button type="primary" onClick={() => {
-                form.resetFields();
-                setShareInfo(null);
-              }}>
-                Create New Share
-              </Button>
-              <Button 
-                danger 
-                type="primary" 
-                onClick={handleCancelShare}
-              >
-                Cancel Share
-              </Button>
-            </Space>
-          </div>
-        </div>
+        </Form>
       )}
     </Modal>
   );

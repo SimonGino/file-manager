@@ -2,8 +2,8 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr
 
 class UserBase(BaseModel):
-    email: EmailStr
     username: str
+    email: EmailStr
 
 class UserCreate(UserBase):
     password: str
@@ -15,4 +15,4 @@ class UserResponse(UserBase):
     updated_at: datetime
 
     class Config:
-        from_attributes = True 
+        from_attributes = True  # 允许从 ORM 模型创建 

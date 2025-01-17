@@ -31,10 +31,13 @@ class ShareType(str, Enum):
 
 class ShareCreate(BaseModel):
     share_type: ShareType
-    share_code: Optional[str] = None  # 可选的分享密码
+    share_code: Optional[str] = None
+    expire_days: Optional[int] = None  # None 表示永久，7表示7天，1表示1天
 
 class ShareUpdate(BaseModel):
-    share_code: str  # 新的分享密码
+    share_type: ShareType
+    share_code: Optional[str] = None
+    expire_days: Optional[int] = None  # None 表示永久，7表示7天，1表示1天
 
 class ShareResponse(BaseModel):
     filename: str

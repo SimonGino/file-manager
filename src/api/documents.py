@@ -6,7 +6,7 @@ import hashlib
 from datetime import datetime, timedelta, timezone
 import os
 import urllib.parse
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_
 import uuid
 import random
 import string
@@ -225,6 +225,56 @@ async def get_my_documents(
             details={"error": str(e)}
         )
 
+@router.post("/{document_id}/share")
+async def share_document(
+    document_id: int,
+    share_data: ShareCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """创建文档分享"""
+    try:
+        query = select(Document).where(
+            Document.id == document_id,
+            Document.uploader_id == current_user.id
+        )
+        result = await db.execute(query)
+        document = result.scalar_one_or_none()
+        
+        if not document:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        # 设置分享信息
+        document.is_shared = True
+        document.share_uuid = str(uuid.uuid4())
+        document.share_type = share_data.share_type
+        document.share_code = share_data.share_code
+        
+        # 设置过期时间
+        if share_data.expire_days is not None:
+            document.share_expired_at = datetime.now(timezone.utc) + timedelta(days=share_data.expire_days)
+        else:
+            document.share_expired_at = None
+            
+        await db.commit()
+        
+        return success_response(
+            data=ShareResponse(
+                filename=document.filename,
+                share_uuid=document.share_uuid,
+                share_type=document.share_type,
+                share_code=document.share_code,
+                share_expired_at=document.share_expired_at,
+                is_shared=True
+            ),
+            message="Document shared successfully"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error sharing document: {str(e)}"
+        )
+
 @router.post("/share/{document_id}")
 async def share_document(
     document_id: int,
@@ -324,9 +374,9 @@ async def get_share_info(
             detail=f"Error retrieving share info: {str(e)}"
         )
 
-@router.put("/share/{share_uuid}")
+@router.put("/{document_id}/share")
 async def update_share_code(
-    share_uuid: str,
+    document_id: int,
     share_data: ShareUpdate,
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
@@ -334,26 +384,29 @@ async def update_share_code(
     """更新分享密码"""
     try:
         query = select(Document).where(
-            Document.share_uuid == share_uuid,
-            Document.is_shared == True,
-            Document.share_expired_at > datetime.now()
+            Document.id == document_id,
+            Document.uploader_id == current_user.id,
+            Document.is_shared == True
         )
         result = await db.execute(query)
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Share not found or expired")
+            raise HTTPException(status_code=404, detail="Document not found or not shared")
             
-        if document.uploader_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Not authorized")
+        # 更新分享设置
+        document.share_type = share_data.share_type
+        if share_data.share_type == "with_password":
+            document.share_code = share_data.share_code
+        else:
+            document.share_code = None
             
-        if document.share_type != ShareType.WITH_PASSWORD:
-            raise HTTPException(status_code=400, detail="This share does not require a password")
+        # 更新过期时间
+        if share_data.expire_days is not None:
+            document.share_expired_at = datetime.now(timezone.utc) + timedelta(days=share_data.expire_days)
+        else:
+            document.share_expired_at = None
             
-        if not share_data.share_code.isdigit() or len(share_data.share_code) != 4:
-            raise HTTPException(status_code=400, detail="Share code must be 4 digits")
-            
-        document.share_code = share_data.share_code
         await db.commit()
         
         return success_response(
@@ -379,13 +432,19 @@ async def access_shared_document(
     db: AsyncSession = Depends(get_db),
     minio_service: MinioService = Depends(MinioService)
 ):
-    """访问分享的文件"""
+    """访问分享的文档"""
     try:
-        query = select(Document).where(
+        # 构建查询条件
+        conditions = [
             Document.share_uuid == share_uuid,
             Document.is_shared == True,
-            Document.share_expired_at > datetime.now()
-        )
+            or_(
+                Document.share_expired_at == None,  # 永久有效
+                Document.share_expired_at > datetime.now(timezone.utc)  # 未过期
+            )
+        ]
+        
+        query = select(Document).where(and_(*conditions))
         result = await db.execute(query)
         document = result.scalar_one_or_none()
         
@@ -399,27 +458,38 @@ async def access_shared_document(
             if share_code != document.share_code:
                 raise HTTPException(status_code=403, detail="Invalid share code")
         
-        # 计算剩余有效期（秒）
-        now = datetime.now(timezone.utc)  # 使用 UTC 时间
-        remaining_seconds = int((document.share_expired_at - now).total_seconds())
+        # 计算预览URL的过期时间
+        if document.share_expired_at:
+            now = datetime.now(timezone.utc)
+            remaining_seconds = int((document.share_expired_at - now).total_seconds())
+            expires = max(remaining_seconds, 600)  # 至少10分钟
+        else:
+            expires = 24 * 60 * 60  # 永久链接默认24小时
         
         # 生成预览URL
         preview_url = await minio_service.get_presigned_url(
             document.minio_path,
-            expires=remaining_seconds if remaining_seconds > 0 else 600  # 如果过期则默认10分钟
+            expires=expires
         )
         
+        # 更新下载次数
+        document.download_count += 1
+        await db.commit()
+        
         # 构建响应数据
-        response_data = DocumentResponse.model_validate(document).model_dump()
-        response_data.update({
+        response_data = {
+            "filename": document.filename,
             "preview_url": preview_url,
-            "mime_type": document.mime_type
-        })
+            "mime_type": document.mime_type,
+            "file_size": document.file_size
+        }
                 
         return success_response(
             data=response_data,
             message="Document accessed successfully"
         )
+    except HTTPException as e:
+        raise e
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -433,11 +503,16 @@ async def check_share_type(
 ):
     """检查分享类型（是否需要密码）"""
     try:
-        query = select(Document).where(
+        conditions = [
             Document.share_uuid == share_uuid,
             Document.is_shared == True,
-            Document.share_expired_at > datetime.now(timezone.utc)
-        )
+            or_(
+                Document.share_expired_at == None,  # 永久有效
+                Document.share_expired_at > datetime.now(timezone.utc)  # 未过期
+            )
+        ]
+        
+        query = select(Document).where(and_(*conditions))
         result = await db.execute(query)
         document = result.scalar_one_or_none()
         

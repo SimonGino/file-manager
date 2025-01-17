@@ -12,7 +12,7 @@ services:
       - "5432:5432"
     volumes:
       - type: bind
-        source: ~/postgres/data
+        source: ~/middleware/postgres/data
         target: /var/lib/postgresql/data
 
   minio:
@@ -27,7 +27,7 @@ services:
       - "9001:9001"
     volumes:
       - type: bind
-        source: ~/minio/data
+        source: ~/middleware/minio/data
         target: /data
 
 volumes:
