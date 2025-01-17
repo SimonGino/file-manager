@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ from src.core.config import get_settings
 from src.db.database import get_db
 from src.services.user_service import UserService
 from src.schemas.user import UserResponse
+from src.api import APIException
 
 settings = get_settings()
 
@@ -25,10 +26,10 @@ async def get_current_user(
         db: AsyncSession = Depends(get_db),
         user_service: UserService = Depends(UserService)
 ) -> UserResponse:
-    credentials_exception = HTTPException(
+    credentials_exception = APIException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+        message="Could not validate credentials",
+        details={"headers": {"WWW-Authenticate": "Bearer"}}
     )
 
     try:

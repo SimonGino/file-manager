@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,6 +10,7 @@ from src.models.models import User
 from src.schemas.user import UserCreate, UserResponse
 from src.core.security import create_access_token
 from src.core.config import get_settings
+from src.api import success_response, APIException
 
 settings = get_settings()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -32,10 +33,10 @@ async def login_for_access_token(
     user = result.scalar_one_or_none()
     
     if not user or not pwd_context.verify(form_data.password, user.hashed_password):
-        raise HTTPException(
+        raise APIException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            message="Incorrect email or password",
+            details={"headers": {"WWW-Authenticate": "Bearer"}}
         )
     
     # 创建访问令牌
@@ -65,9 +66,9 @@ async def register(
     query = select(User).where(User.email == user_data.email)
     result = await db.execute(query)
     if result.scalar_one_or_none():
-        raise HTTPException(
+        raise APIException(
             status_code=400,
-            detail="Email already registered"
+            message="Email already registered"
         )
     
     # 创建新用户
@@ -83,4 +84,7 @@ async def register(
     await db.commit()
     await db.refresh(db_user)
     
-    return UserResponse.model_validate(db_user) 
+    return success_response(
+        data=UserResponse.model_validate(db_user),
+        message="User registered successfully"
+    ) 

@@ -59,25 +59,32 @@ async def upload_document(
         f"{file_md5}{file_extension}"           # MD5 + 原始文件后缀
     )
     
-    # 上传到MinIO
-    await minio_service.upload_file(minio_path, content, file.content_type)
+    try:
+        # 上传到MinIO
+        await minio_service.upload_file(minio_path, content, file.content_type)
 
-    # 保存文档信息到数据库
-    doc_create = DocumentCreate(
-        filename=file.filename,  # 原始文件名保存在数据库中
-        file_md5=file_md5,
-        file_size=len(content),
-        mime_type=file.content_type,
-        minio_path=minio_path,   # MinIO中的路径包含后缀
-        file_uuid=file_md5,      # 使用MD5作为UUID
-        uploader_id=current_user.id
-    )
+        # 保存文档信息到数据库
+        doc_create = DocumentCreate(
+            filename=file.filename,  # 原始文件名保存在数据库中
+            file_md5=file_md5,
+            file_size=len(content),
+            mime_type=file.content_type,
+            minio_path=minio_path,   # MinIO中的路径包含后缀
+            file_uuid=file_md5,      # 使用MD5作为UUID
+            uploader_id=current_user.id
+        )
 
-    doc = await document_service.create(db, doc_create)
-    return success_response(
-        data=DocumentResponse.model_validate(doc),
-        message="File uploaded successfully"
-    )
+        doc = await document_service.create(db, doc_create)
+        return success_response(
+            data=DocumentResponse.model_validate(doc),
+            message="File uploaded successfully"
+        )
+    except Exception as e:
+        raise APIException(
+            status_code=500,
+            message="Error uploading file",
+            details={"error": str(e)}
+        )
 
 @router.get("/preview/{document_id}")
 async def preview_document(
@@ -94,7 +101,7 @@ async def preview_document(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise APIException(status_code=404, message="Document not found")
             
         # 生成预签名URL（例如10分钟有效）
         presigned_url = await minio_service.get_presigned_url(
@@ -106,14 +113,15 @@ async def preview_document(
             data={
                 "preview_url": presigned_url,
                 "mime_type": document.mime_type,
-                "filename": document.filename  # 也返回文件名，可能会用到
+                "filename": document.filename
             },
             message="Preview URL generated successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error generating preview URL: {str(e)}"
+            message="Error generating preview URL",
+            details={"error": str(e)}
         )
 
 @router.get("/download/{document_id}")
@@ -213,7 +221,6 @@ async def get_my_documents(
         result = await db.execute(query)
         documents = result.scalars().all()
         
-        # 使用统一的响应格式
         return success_response(
             data=[DocumentResponse.model_validate(doc) for doc in documents],
             message="Documents retrieved successfully"
@@ -232,56 +239,6 @@ async def share_document(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user)
 ):
-    """创建文档分享"""
-    try:
-        query = select(Document).where(
-            Document.id == document_id,
-            Document.uploader_id == current_user.id
-        )
-        result = await db.execute(query)
-        document = result.scalar_one_or_none()
-        
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-            
-        # 设置分享信息
-        document.is_shared = True
-        document.share_uuid = str(uuid.uuid4())
-        document.share_type = share_data.share_type
-        document.share_code = share_data.share_code
-        
-        # 设置过期时间
-        if share_data.expire_days is not None:
-            document.share_expired_at = datetime.now(timezone.utc) + timedelta(days=share_data.expire_days)
-        else:
-            document.share_expired_at = None
-            
-        await db.commit()
-        
-        return success_response(
-            data=ShareResponse(
-                filename=document.filename,
-                share_uuid=document.share_uuid,
-                share_type=document.share_type,
-                share_code=document.share_code,
-                share_expired_at=document.share_expired_at,
-                is_shared=True
-            ),
-            message="Document shared successfully"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error sharing document: {str(e)}"
-        )
-
-@router.post("/share/{document_id}")
-async def share_document(
-    document_id: int,
-    share_data: ShareCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user = Depends(get_current_user)
-):
     """分享文件，可选是否需要密码"""
     try:
         query = select(Document).where(Document.id == document_id)
@@ -289,10 +246,10 @@ async def share_document(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise APIException(status_code=404, message="Document not found")
             
         if document.uploader_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Not authorized")
+            raise APIException(status_code=403, message="Not authorized")
         
         # 如果没有分享UUID或已过期，生成新的
         if not document.share_uuid or (
@@ -309,7 +266,7 @@ async def share_document(
         if share_data.share_type == ShareType.WITH_PASSWORD:
             if share_data.share_code:
                 if not share_data.share_code.isdigit() or len(share_data.share_code) != 4:
-                    raise HTTPException(status_code=400, detail="Share code must be 4 digits")
+                    raise APIException(status_code=400, message="Share code must be 4 digits")
                 document.share_code = share_data.share_code
             else:
                 # 生成随机4位数密码
@@ -331,9 +288,72 @@ async def share_document(
             message="Document shared successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error sharing document: {str(e)}"
+            message="Error sharing document",
+            details={"error": str(e)}
+        )
+
+@router.get("/share/{document_id}")
+async def share_document(
+    document_id: int,
+    share_data: ShareCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """分享文件，可选是否需要密码"""
+    try:
+        query = select(Document).where(Document.id == document_id)
+        result = await db.execute(query)
+        document = result.scalar_one_or_none()
+        
+        if not document:
+            raise APIException(status_code=404, message="Document not found")
+            
+        if document.uploader_id != current_user.id:
+            raise APIException(status_code=403, message="Not authorized")
+        
+        # 如果没有分享UUID或已过期，生成新的
+        if not document.share_uuid or (
+            document.share_expired_at and document.share_expired_at < datetime.now(timezone.utc)
+        ):
+            document.share_uuid = str(uuid.uuid4())
+        
+        # 更新分享信息
+        document.share_type = share_data.share_type.value
+        document.share_expired_at = datetime.now(timezone.utc) + timedelta(days=7)
+        document.is_shared = True
+        
+        # 如果需要密码，验证或生成密码
+        if share_data.share_type == ShareType.WITH_PASSWORD:
+            if share_data.share_code:
+                if not share_data.share_code.isdigit() or len(share_data.share_code) != 4:
+                    raise APIException(status_code=400, message="Share code must be 4 digits")
+                document.share_code = share_data.share_code
+            else:
+                # 生成随机4位数密码
+                document.share_code = ''.join(random.choices(string.digits, k=4))
+        else:
+            document.share_code = None
+        
+        await db.commit()
+        await db.refresh(document)
+        
+        return success_response(
+            data=ShareResponse(
+                share_uuid=document.share_uuid,
+                share_type=document.share_type,
+                share_code=document.share_code,
+                share_expired_at=document.share_expired_at,
+                filename=document.filename
+            ),
+            message="Document shared successfully"
+        )
+    except Exception as e:
+        raise APIException(
+            status_code=500,
+            message="Error sharing document",
+            details={"error": str(e)}
         )
 
 @router.get("/share/{share_uuid}")
@@ -353,10 +373,10 @@ async def get_share_info(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Share not found or expired")
+            raise APIException(status_code=404, message="Share not found or expired")
             
         if document.uploader_id != current_user.id:
-            raise HTTPException(status_code=403, detail="Not authorized")
+            raise APIException(status_code=403, message="Not authorized")
             
         return success_response(
             data=ShareResponse(
@@ -369,9 +389,10 @@ async def get_share_info(
             message="Share info retrieved successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error retrieving share info: {str(e)}"
+            message="Error retrieving share info",
+            details={"error": str(e)}
         )
 
 @router.put("/{document_id}/share")
@@ -392,7 +413,7 @@ async def update_share_code(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found or not shared")
+            raise APIException(status_code=404, message="Document not found or not shared")
             
         # 更新分享设置
         document.share_type = share_data.share_type
@@ -420,9 +441,10 @@ async def update_share_code(
             message="Share code updated successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error updating share code: {str(e)}"
+            message="Error updating share code",
+            details={"error": str(e)}
         )
 
 @router.get("/shared/{share_uuid}")
@@ -449,14 +471,14 @@ async def access_shared_document(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Share not found or expired")
+            raise APIException(status_code=404, message="Share not found or expired")
             
         # 检查密码
         if document.share_type == ShareType.WITH_PASSWORD.value:
             if not share_code:
-                raise HTTPException(status_code=403, detail="Share code required")
+                raise APIException(status_code=403, message="Share code required")
             if share_code != document.share_code:
-                raise HTTPException(status_code=403, detail="Invalid share code")
+                raise APIException(status_code=403, message="Invalid share code")
         
         # 计算预览URL的过期时间
         if document.share_expired_at:
@@ -476,24 +498,20 @@ async def access_shared_document(
         document.download_count += 1
         await db.commit()
         
-        # 构建响应数据
-        response_data = {
-            "filename": document.filename,
-            "preview_url": preview_url,
-            "mime_type": document.mime_type,
-            "file_size": document.file_size
-        }
-                
         return success_response(
-            data=response_data,
+            data={
+                "filename": document.filename,
+                "preview_url": preview_url,
+                "mime_type": document.mime_type,
+                "file_size": document.file_size
+            },
             message="Document accessed successfully"
         )
-    except HTTPException as e:
-        raise e
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error accessing shared document: {str(e)}"
+            message="Error accessing shared document",
+            details={"error": str(e)}
         )
 
 @router.get("/shared/{share_uuid}/check")
@@ -517,7 +535,7 @@ async def check_share_type(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Share not found or expired")
+            raise APIException(status_code=404, message="Share not found or expired")
         
         return success_response(
             data={
@@ -527,9 +545,10 @@ async def check_share_type(
             message="Share type checked successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error checking share type: {str(e)}"
+            message="Error checking share type",
+            details={"error": str(e)}
         )
 
 @router.get("/{document_id}/share")
@@ -548,7 +567,7 @@ async def get_document_share_info(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise APIException(status_code=404, message="Document not found")
             
         return success_response(
             data=ShareResponse(
@@ -562,9 +581,10 @@ async def get_document_share_info(
             message="Share info retrieved successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error retrieving share info: {str(e)}"
+            message="Error retrieving share info",
+            details={"error": str(e)}
         )
 
 @router.delete("/{document_id}/share")
@@ -583,7 +603,7 @@ async def cancel_document_share(
         document = result.scalar_one_or_none()
         
         if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
+            raise APIException(status_code=404, message="Document not found")
             
         # 重置分享相关字段
         document.is_shared = False
@@ -602,9 +622,10 @@ async def cancel_document_share(
             message="Share cancelled successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error cancelling share: {str(e)}"
+            message="Error cancelling share",
+            details={"error": str(e)}
         )
 
 @router.get("/shared")
@@ -644,7 +665,8 @@ async def list_shared_documents(
             message="Shared documents retrieved successfully"
         )
     except Exception as e:
-        raise HTTPException(
+        raise APIException(
             status_code=500,
-            detail=f"Error retrieving shared documents: {str(e)}"
+            message="Error retrieving shared documents",
+            details={"error": str(e)}
         )
