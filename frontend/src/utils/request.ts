@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getStoredToken, clearUserAuth } from './auth';
+import { getStoredToken } from './auth';
 import { message } from 'antd';
 
 const request = axios.create({
