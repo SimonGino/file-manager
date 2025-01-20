@@ -25,10 +25,12 @@ request.interceptors.response.use(
     return response.data;
   },
   (error) => {
-    const { response, message } = error || {};
-    if (message) {
-      message.error(message);
-      return new Promise(() => {});
+    const originMsg = error?.response?.data?.detail?.message;
+    const { response, message: msg, detail = {} } = error || {};
+
+    if (originMsg || msg || detail?.message) {
+      message.error(originMsg || msg || detail?.message);
+      return new Promise(() => { });
     }
 
     // 显示错误消息
