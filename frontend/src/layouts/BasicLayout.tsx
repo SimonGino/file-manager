@@ -1,26 +1,23 @@
 import React from 'react';
 import { Layout } from 'antd';
-import UserMenu from '@/components/UserMenu';
+import { Outlet } from 'react-router-dom';
+import Header from '../components/Header';
+import Footer from '../components/Footer';
 
-const { Header, Content } = Layout;
+const { Content } = Layout;
 
-const BasicLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const BasicLayout: React.FC = () => {
   return (
-    <Layout>
-      <Header style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        background: '#fff',
-        padding: '0 24px',
-        boxShadow: '0 1px 4px rgba(0,21,41,.08)'
+    <Layout style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Header />
+      <Content style={{ 
+        padding: '24px', 
+        backgroundColor: '#fff',
+        flex: '1 0 auto'
       }}>
-        <div className="logo">Logo</div>
-        <UserMenu />
-      </Header>
-      <Content style={{ padding: '24px', minHeight: 'calc(100vh - 64px)' }}>
-        {children}
+        <Outlet />
       </Content>
+      <Footer />
     </Layout>
   );
 };

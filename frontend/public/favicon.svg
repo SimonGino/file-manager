@@ -1,0 +1,10 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="16" cy="16" r="16" fill="#1890ff"/>
+  
+  <!-- 文件夹图标 -->
+  <path d="M7 9C7 8.44772 7.44772 8 8 8H13L15 10H24C24.5523 10 25 10.4477 25 11V23C25 23.5523 24.5523 24 24 24H8C7.44772 24 7 23.5523 7 23V9Z" fill="white"/>
+  
+  <!-- 分享箭头 -->
+  <path d="M16 12V16M16 16L14 14M16 16L18 14" stroke="#1890ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg> 
