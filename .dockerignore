@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.env.*
+.venv
+env/
+venv/
+ENV/
+.pdm-python
+.pdm.toml
+
+# Development
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Project specific
+tests/
+docs/
+*.md
+LICENSE
+frontend/
+docker/
+*.log
+*.sqlite3
+
+# PDM
+__pypackages__/
+.pdm-build/
+pdm.lock
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/ 

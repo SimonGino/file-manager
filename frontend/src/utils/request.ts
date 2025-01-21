@@ -36,8 +36,12 @@ request.interceptors.response.use(
     if (status === 401 && !isLoginRequest) {
       localStorage.removeItem('token');
       clearUserAuth();
+      message.error(originMsg || '登录失败');
+    }else{
+      localStorage.removeItem('token');
+      clearUserAuth();
+      // 其他接口的 401 错误，重定向到 shared 页面
       window.location.href = '/shared';
-      return new Promise(() => {});
     }
 
 

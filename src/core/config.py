@@ -5,6 +5,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Document Management System"
     DATABASE_URL: str
     MINIO_ENDPOINT: str
+    MINIO_SECURE: bool = False
     MINIO_ACCESS_KEY: str
     MINIO_SECRET_KEY: str
     MINIO_BUCKET_NAME: str
