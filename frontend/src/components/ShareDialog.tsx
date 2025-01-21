@@ -102,15 +102,26 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
     }
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     try {
-      if (inputRef.current) {
-        inputRef.current.select();
-        message.success('Link copied');
-      }
+      if (!inputRef.current?.input?.value) return;
+      const text = inputRef.current.input.value;
+      await navigator.clipboard.writeText(text);
+      message.success('Link copied to clipboard');
     } catch (err) {
       console.error('Failed to copy:', err);
-      message.error('Failed to copy link');
+      
+      // 降级方案：如果 clipboard API 失败，尝试使用传统方法
+      try {
+        if (inputRef.current) {
+          inputRef.current.select();
+          (document as any).execCommand('copy');
+          message.success('Link copied to clipboard');
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr);
+        message.error('Failed to copy link');
+      }
     }
   };
 
