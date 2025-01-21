@@ -14,7 +14,7 @@ class MinioService:
             settings.MINIO_ENDPOINT,
             access_key=settings.MINIO_ACCESS_KEY,
             secret_key=settings.MINIO_SECRET_KEY,
-            secure=False  # 如果使用HTTPS，设置为True
+            secure=settings.MINIO_SECURE
         )
         self.bucket_name = settings.MINIO_BUCKET_NAME
         self._ensure_bucket_exists()

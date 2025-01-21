@@ -61,13 +61,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta-backend.outputs.tags }}
           labels: ${{ steps.meta-backend.outputs.labels }}
-          build-args: |
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-            MINIO_ENDPOINT=${{ secrets.MINIO_ENDPOINT }}
-            MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
-            MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
-            MINIO_BUCKET_NAME=${{ secrets.MINIO_BUCKET_NAME }}
-            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
 
       - name: Build and push Frontend Docker image
         uses: docker/build-push-action@v5
