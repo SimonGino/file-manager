@@ -40,7 +40,6 @@ docker/
 # PDM
 __pypackages__/
 .pdm-build/
-pdm.lock
 
 # Distribution / packaging
 dist/
