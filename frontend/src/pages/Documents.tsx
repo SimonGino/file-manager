@@ -33,9 +33,9 @@ const Documents: React.FC = () => {
   };
 
   const handleDownload = async (record: Document) => {
-    const response = await request.get(`/documents/download/${record.id}`, {
+    const response = (await request.get(`/documents/download/${record.id}`, {
       responseType: 'blob'
-    });
+    })) as Blob;
 
     const url = window.URL.createObjectURL(new Blob([response]));
     const link = document.createElement('a');
