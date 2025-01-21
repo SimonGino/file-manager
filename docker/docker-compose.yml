@@ -14,9 +14,10 @@ services:
       - type: bind
         source: ~/middleware/postgres/data
         target: /var/lib/postgresql/data
+    restart: unless-stopped
 
   minio:
-    image: quay.io/minio/minio
+    image: minio/minio
     container_name: minio
     command: server /data --console-address ":9001"
     environment:
@@ -29,6 +30,28 @@ services:
       - type: bind
         source: ~/middleware/minio/data
         target: /data
+    restart: unless-stopped
+
+  backend:
+    image: ghcr.io/simongino/file-manager-backend:main
+    container_name: backend
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - minio
+    restart: unless-stopped
+
+  frontend:
+    image: ghcr.io/simongino/file-manager-frontend:main
+    container_name: frontend
+    ports:
+      - "3001:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:
