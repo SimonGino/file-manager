@@ -3,7 +3,7 @@ import { Layout, Menu, Button, theme } from 'antd';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { FileOutlined, ShareAltOutlined, LoginOutlined, LogoutOutlined } from '@ant-design/icons';
 import UserMenu from '../components/UserMenu';
-
+import Footer from '../components/Footer';
 const { Header, Content } = Layout;
 
 const MainLayout: React.FC = () => {
@@ -94,6 +94,7 @@ const MainLayout: React.FC = () => {
           <Outlet />
         </div>
       </Content>
+      <Footer />
     </Layout>
   );
 };
