@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal, Form, Switch, Input, Space, Button, message, Radio } from 'antd';
 import { CopyOutlined, EditOutlined } from '@ant-design/icons';
 import request from '@/utils/request';
 import { Document } from '@/types/document';
+import type { InputRef } from 'antd';
 
 interface ShareDialogProps {
   visible: boolean;
@@ -14,6 +15,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
   const [form] = Form.useForm();
   const [isSharing, setIsSharing] = useState(false);
   const [shareInfo, setShareInfo] = useState<any>(null);
+  const inputRef = useRef<InputRef>(null);
 
   // 获取分享状态
   useEffect(() => {
@@ -100,17 +102,15 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
     }
   };
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = () => {
     try {
-      if (!navigator.clipboard) {
-        throw new Error('Clipboard API not available');
+      if (inputRef.current) {
+        inputRef.current.select();
+        message.success('Link copied');
       }
-      
-      await navigator.clipboard.writeText(text);
-      message.success?.('Link copied');
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Failed to copy:', err);
-      message.error?.('Failed to copy link');
+      message.error('Failed to copy link');
     }
   };
 
@@ -186,14 +186,13 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
                 <div style={{ marginBottom: 8 }}>Share Link:</div>
                 <Space>
                   <Input
+                    ref={inputRef}
                     value={`${window.location.origin}/shared/${shareInfo.share_uuid}`}
                     readOnly
                   />
                   <Button
                     icon={<CopyOutlined />}
-                    onClick={() => {
-                      copyToClipboard(`${window.location.origin}/shared/${shareInfo.share_uuid}`);
-                    }}
+                    onClick={copyToClipboard}
                   >
                     Copy
                   </Button>
