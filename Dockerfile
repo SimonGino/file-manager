@@ -9,7 +9,6 @@ RUN pip install pdm
 # Copy PDM files
 COPY pyproject.toml pdm.lock ./
 COPY src/ src/
-COPY .env .env
 
 # Install dependencies
 RUN pdm install --prod --no-lock --no-editable
