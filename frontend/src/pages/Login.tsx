@@ -19,7 +19,7 @@ const Login: React.FC = () => {
       const { user, access_token } = await request.post<any, LoginResponse>('/token', formData);
       setUserAuth(user, access_token);
       message.success('登录成功');
-      navigate('/');
+      navigate('/documents');
     } catch (error) {
       console.error('Login error:', error);
     }
