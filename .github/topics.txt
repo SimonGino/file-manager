@@ -1,0 +1,14 @@
+file-management
+file-sharing
+fastapi
+react
+typescript
+python
+docker
+minio
+postgresql
+ant-design
+web-application
+file-upload
+secure-sharing
+document-management 

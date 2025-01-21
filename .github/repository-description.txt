@@ -1,0 +1,1 @@
+A modern file management system with secure sharing, built with FastAPI and React. Features include file upload/download, password protection, expiration dates, and real-time updates. 
