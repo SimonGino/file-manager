@@ -33,9 +33,9 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
             expire_days: response.data.expire_days || 'forever'
           });
         }
-      } catch (error) {
+      } catch (error: any) {
         // 404 表示未分享，其他错误才提示
-        if (error.response?.status !== 404) {
+        if (error?.response?.status !== 404) {
           message.error('Failed to get share status');
         }
       }
@@ -97,6 +97,20 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
       setShareInfo(response.data);
     } catch (error) {
       message.error('Failed to update share settings');
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (!navigator.clipboard) {
+        throw new Error('Clipboard API not available');
+      }
+      
+      await navigator.clipboard.writeText(text);
+      message.success?.('Link copied');
+    } catch (err: unknown) {
+      console.error('Failed to copy:', err);
+      message.error?.('Failed to copy link');
     }
   };
 
@@ -178,10 +192,7 @@ const ShareDialog: React.FC<ShareDialogProps> = ({ visible, onClose, document })
                   <Button
                     icon={<CopyOutlined />}
                     onClick={() => {
-                      navigator.clipboard.writeText(
-                        `${window.location.origin}/shared/${shareInfo.share_uuid}`
-                      );
-                      message.success('Link copied');
+                      copyToClipboard(`${window.location.origin}/shared/${shareInfo.share_uuid}`);
                     }}
                   >
                     Copy
