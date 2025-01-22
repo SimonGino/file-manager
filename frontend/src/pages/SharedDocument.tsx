@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Input, Button, message, Spin, Layout, Space } from 'antd';
+import Footer from '../components/Footer';
 import request from '@/utils/request';
 
 const { Header, Content } = Layout;
@@ -187,6 +188,7 @@ const SharedDocument: React.FC = () => {
       </Header>
 
       <Content style={{ padding: '24px' }}>{renderContent()}</Content>
+      <Footer />
     </Layout>
   );
 };
