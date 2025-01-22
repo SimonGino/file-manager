@@ -88,12 +88,13 @@ async def upload_document(
 
 @router.get("/preview/{document_id}")
 async def preview_document(
+    request: Request,
     document_id: int,
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_user),
     minio_service: MinioService = Depends(MinioService)
 ):
-    """获取文档预览URL"""
+    """获取文档预览流"""
     try:
         # 查询文档
         query = select(Document).where(Document.id == document_id)
@@ -103,20 +104,53 @@ async def preview_document(
         if not document:
             raise APIException(status_code=404, message="Document not found")
             
-        # 生成预签名URL（例如10分钟有效）
-        presigned_url = await minio_service.get_presigned_url(
-            document.minio_path,
-            expires=600  # 10分钟
-        )
+        # 从MinIO获取文件
+        file_response = await minio_service.get_file(document.minio_path)
         
-        return success_response(
-            data={
-                "preview_url": presigned_url,
-                "mime_type": document.mime_type,
-                "filename": document.filename
-            },
-            message="Preview URL generated successfully"
-        )
+        # 获取文件大小
+        file_size = document.file_size
+        
+        # 处理断点续传
+        range_header = request.headers.get("range")
+        
+        # 创建文件流生成器
+        def iterfile(start: int = 0, chunk_size: int = 8192) -> Generator[bytes, None, None]:
+            if start > 0:
+                file_response.read(start)
+            
+            while True:
+                chunk = file_response.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        
+        headers = {
+            "Content-Type": document.mime_type,
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache"
+        }
+        
+        if range_header:
+            # 处理断点续传请求
+            start, end = range_header.replace("bytes=", "").split("-")
+            start = int(start)
+            end = int(end) if end else file_size - 1
+            
+            headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+            headers["Content-Length"] = str(end - start + 1)
+            
+            return StreamingResponse(
+                iterfile(start=start),
+                status_code=206,
+                headers=headers
+            )
+        else:
+            # 普通预览请求
+            headers["Content-Length"] = str(file_size)
+            return StreamingResponse(
+                iterfile(),
+                headers=headers
+            )
     except Exception as e:
         raise APIException(
             status_code=500,
@@ -449,6 +483,7 @@ async def update_share_code(
 
 @router.get("/shared/{share_uuid}")
 async def access_shared_document(
+    request: Request,
     share_uuid: str,
     share_code: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
@@ -480,33 +515,59 @@ async def access_shared_document(
             if share_code != document.share_code:
                 raise APIException(status_code=403, message="Invalid share code")
         
-        # 计算预览URL的过期时间
-        if document.share_expired_at:
-            now = datetime.now(timezone.utc)
-            remaining_seconds = int((document.share_expired_at - now).total_seconds())
-            expires = max(remaining_seconds, 600)  # 至少10分钟
-        else:
-            expires = 24 * 60 * 60  # 永久链接默认24小时
+        # 从MinIO获取文件
+        file_response = await minio_service.get_file(document.minio_path)
         
-        # 生成预览URL
-        preview_url = await minio_service.get_presigned_url(
-            document.minio_path,
-            expires=expires
-        )
+        # 获取文件大小
+        file_size = document.file_size
+        
+        # 处理断点续传
+        range_header = request.headers.get("range")
+        
+        # 创建文件流生成器
+        def iterfile(start: int = 0, chunk_size: int = 8192) -> Generator[bytes, None, None]:
+            if start > 0:
+                file_response.read(start)
+            
+            while True:
+                chunk = file_response.read(chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        
+        headers = {
+            "Content-Type": document.mime_type,
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache"
+        }
+        
+        if range_header:
+            # 处理断点续传请求
+            start, end = range_header.replace("bytes=", "").split("-")
+            start = int(start)
+            end = int(end) if end else file_size - 1
+            
+            headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+            headers["Content-Length"] = str(end - start + 1)
+            
+            response = StreamingResponse(
+                iterfile(start=start),
+                status_code=206,
+                headers=headers
+            )
+        else:
+            # 普通预览请求
+            headers["Content-Length"] = str(file_size)
+            response = StreamingResponse(
+                iterfile(),
+                headers=headers
+            )
         
         # 更新下载次数
         document.download_count += 1
         await db.commit()
         
-        return success_response(
-            data={
-                "filename": document.filename,
-                "preview_url": preview_url,
-                "mime_type": document.mime_type,
-                "file_size": document.file_size
-            },
-            message="Document accessed successfully"
-        )
+        return response
     except Exception as e:
         raise APIException(
             status_code=500,
@@ -638,7 +699,10 @@ async def list_shared_documents(
         query = select(Document).where(
             # Document.uploader_id == current_user.id,
             Document.is_shared == True,
-            Document.share_expired_at > datetime.now(timezone.utc)
+            or_(
+                Document.share_expired_at == None,  # 永久有效
+                Document.share_expired_at > datetime.now(timezone.utc)  # 未过期
+            )
         ).order_by(Document.updated_at.desc())
         
         result = await db.execute(query)

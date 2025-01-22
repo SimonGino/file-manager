@@ -49,13 +49,27 @@ const SharedDocument: React.FC = () => {
 
   // 获取文件信息
   const getDocumentInfo = async (code?: string) => {
+    let blobUrl: string | null = null;
     try {
-      const response = await request.get(`/documents/shared/${shareUuid}`, {
-        params: code ? { share_code: code } : undefined
+      const response:any = await request.get(`/documents/shared/${shareUuid}`, {
+        params: code ? { share_code: code } : undefined,
+        responseType: 'blob'
       });
-      setDocumentInfo(response.data);
+      
+      blobUrl = URL.createObjectURL(response);      
+      const contentType = response.type;
+      
+      setDocumentInfo({
+        filename: shareInfo?.filename || '',
+        mime_type: contentType,
+        preview_url: blobUrl
+      });
     } catch (error: any) {
-      message.error(error.response?.data?.detail || 'Failed to access document');
+      // 清理已创建的blobUrl
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+      message.error(error.response?.data?.detail || error.message || 'Failed to access document');
       throw error;
     }
   };
@@ -125,26 +139,28 @@ const SharedDocument: React.FC = () => {
       return (
         <Card>
           <h2>{documentInfo.filename}</h2>
-          {documentInfo.mime_type.startsWith('image/') ? (
-            <img src={documentInfo.preview_url} style={{ maxWidth: '100%', maxHeight: '80vh' }} alt={documentInfo.filename} />
-          ) : documentInfo.mime_type.startsWith('video/') ? (
-            <video controls style={{ maxWidth: '100%', maxHeight: '80vh' }}>
-              <source src={documentInfo.preview_url} type={documentInfo.mime_type} />
-              Your browser does not support the video tag.
-            </video>
-          ) : documentInfo.mime_type.startsWith('audio/') ? (
-            <audio controls style={{ width: '100%' }}>
-              <source src={documentInfo.preview_url} type={documentInfo.mime_type} />
-              Your browser does not support the audio tag.
-            </audio>
-          ) : (
-            <div style={{ textAlign: 'center', padding: '20px' }}>
-              <p>This file type cannot be previewed directly.</p>
-              <Button type="primary" href={documentInfo.preview_url} target="_blank">
-                Download File
-              </Button>
-            </div>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+            {documentInfo.mime_type.startsWith('image/') ? (
+              <img src={documentInfo.preview_url} style={{ maxWidth: '100%', maxHeight: '80vh' }} alt={documentInfo.filename} />
+            ) : documentInfo.mime_type.startsWith('video/') ? (
+              <video controls style={{ maxWidth: '100%', maxHeight: '80vh' }}>
+                <source src={documentInfo.preview_url} type={documentInfo.mime_type} />
+                Your browser does not support the video tag.
+              </video>
+            ) : documentInfo.mime_type.startsWith('audio/') ? (
+              <audio controls style={{ width: '100%' }}>
+                <source src={documentInfo.preview_url} type={documentInfo.mime_type} />
+                Your browser does not support the audio tag.
+              </audio>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px' }}>
+                <p>This file type cannot be previewed directly.</p>
+                <Button type="primary" href={documentInfo.preview_url} download={documentInfo.filename}>
+                  Download File
+                </Button>
+              </div>
+            )}
+          </div>
         </Card>
       );
     }

@@ -27,23 +27,37 @@ const Documents: React.FC = () => {
   };
 
   const handlePreview = async (record: Document) => {
-    const response = await request.get(`/documents/preview/${record.id}`);
-    setPreviewFile(response.data);
-    setPreviewVisible(true);
+    try {
+      // 使用后端的preview接口
+      const previewUrl = `/documents/preview/${record.id}`;
+      setPreviewFile({
+        ...record,
+        preview_url: previewUrl
+      });
+      setPreviewVisible(true);
+    } catch (error) {
+      message.error('Failed to preview file');
+    }
   };
 
   const handleDownload = async (record: Document) => {
-    const response = (await request.get(`/documents/download/${record.id}`, {
-      responseType: 'blob'
-    })) as Blob;
+    try {
+      const response = await request.get(`/documents/download/${record.id}`, {
+        responseType: 'blob',
+        timeout: 0 // 禁用超时，因为大文件下载可能需要较长时间
+      });
 
-    const url = window.URL.createObjectURL(new Blob([response]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', record.filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', record.filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url); // 清理URL对象
+    } catch (error) {
+      message.error('Failed to download file');
+    }
   };
 
   const handleShare = (record: Document) => {
